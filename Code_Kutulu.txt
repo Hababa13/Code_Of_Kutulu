@@ -1,0 +1,190 @@
+using System;
+using System.Linq;
+using System.IO;
+using System.Text;
+using System.Collections;
+using System.Collections.Generic;
+
+/**
+ * Survive the wrath of Kutulu
+ * Coded fearlessly by JohnnyYuge & nmahoude (ok we might have been a bit scared by the old god...but don't say anything)
+ **/
+public class Point
+{
+	public int x;
+	public int y;
+	public Point(int x,int y)
+	{
+		this.x = x;
+		this.y = y;
+	}
+}	
+
+public class Vector
+{
+    public double x;
+    public double y;
+    public void SetXY(double x, double y) {this.x=x;this.y=y;}
+    public Vector (double x, double y) {this.x=x;this.y=y;}
+    public Vector () {this.x=0.0f;this.y=0.0f;}
+    public double Norm2() {return x*x+y*y;}
+    public double Norm() {return Math.Sqrt(Norm2());}
+    public static Vector operator+ (Vector a,Vector b) 
+    {
+        Vector res = new Vector(a.x+b.x,a.y+b.y);
+        return res;
+    }
+    public static Vector operator- (Vector a,Vector b) 
+    {
+        Vector res = new Vector(a.x-b.x,a.y-b.y);
+        return res;
+    }
+    public static double Cross (Vector a,Vector b) 
+    {
+        return a.x*b.y-a.y*b.x;
+    }
+    public static double operator* (Vector a, Vector b)
+    {
+        return a.x*b.x + a.y*b.y;
+    }
+    public static Vector Rotation (Vector a, double b) // en degres
+    {
+        b *= Math.PI/180.0f;
+        Vector res = new Vector(a.x*Math.Cos(b)+a.y*Math.Sin(b),-a.x*Math.Sin(b)+a.y*Math.Cos(b));
+        return res;
+    }
+    public static Vector Rot_Affine(Vector point, Vector a, double b)
+    {
+        return (point + Rotation(a, b));
+    }
+    public static double Angle_Vec(Vector orig, Vector dest) // Renvoie le cos de l'angle de 2 vecteurs
+    {
+        return (orig*dest/orig.Norm()/dest.Norm());
+    }
+}
+
+public class Plateau
+{
+    public string[] Tab;
+    public int width;
+    public int height;
+    
+    Tableau(string[] Tab, int width, int height)
+    {
+        this.Tab = Tab;
+        this.width = width;
+        this.height = height;
+    }
+    
+}
+
+public class Joueur{
+	public int x;
+	public int y;
+	public int sante;
+	Joueur (int x, int y, int sante)
+	{
+		this.x 		= x;
+		this.y		= y;
+		this.sante 	= sante;
+	}
+}
+
+public class Hero:Joueur{
+	Hero(Point p_h, int sante) : base(p_h, sante) {}
+}
+
+public class Joueur_Controller{
+	public Hero hero;
+	public Joueur[] joueur;
+	public int Nb_joueurs = 3;
+	public int sanityLossLonely;
+	public int sanityLossGroup;
+	public int wandererSpawnTime;
+	public int wandererLifeTime;
+	
+	public Joueur_Controller(Point pos_hero, int sante_h, Point[] Pos_Joueurs, int[] sante_J, int sanityLossLonely, int sanityLossGroup, int wandererSpawnTime, int wandererLifeTime)
+	{
+		this.sanityLossLonely = sanityLossLonely;
+		this.sanityLossGroup = sanityLossGroup;
+		this.wandererSpawnTime = wandererSpawnTime:
+		this.wandererLifeTime = wandererLifeTime;
+		hero = new Hero(pos_hero, sante_h);
+		joueur = new Joueur[];
+	
+		for(int i=0;i<Nb_Joueurs;i++)
+			joueur[i] = new Joueur(Pos_Joueurs[i],sante_J[i]);
+	}
+}
+
+public class Jeu
+{
+	public Plateau plateau;
+	public Joueur_Controller joueur_Controller;
+	public static int Nb_Instances = 0;
+	public Jeu(string[] Tab, int width, int height, Point pos_hero, int sante_hero, Point[] pos_joueurs, int[] sante_joueurs, int sanityLossLonely, int sanityLossGroup, int wandererSpawnTime, int wandererLifeTime)
+	{
+		plateau = new Plateau(Tab, width, height);
+		joueur_Controller = new Joueur_Controller(pos_hero, sante_hero, pos_joueurs, sante_joueurs, sanityLossLonely, sanityLossGroup, wandererSpawnTime, wandererLifeTime);
+		Nb_Instances++;
+	}
+	
+	public void Update()
+	{
+		
+	}
+	
+	public string Commande()
+	{
+		string resultat = "";
+		return resultat;
+	}
+
+class Player
+{
+    static void Main(string[] args)
+    {
+        string[] inputs;
+        int width = int.Parse(Console.ReadLine());
+        int height = int.Parse(Console.ReadLine());
+        string[] line = [];
+		Jeu jeu;
+        for (int i = 0; i < height; i++)
+        {
+            line.append(Console.ReadLine());
+        }
+        inputs = Console.ReadLine().Split(' ');
+        int sanityLossLonely = int.Parse(inputs[0]); // how much sanity you lose every turn when alone, always 3 until wood 1
+        int sanityLossGroup = int.Parse(inputs[1]); // how much sanity you lose every turn when near another player, always 1 until wood 1
+        int wandererSpawnTime = int.Parse(inputs[2]); // how many turns the wanderer take to spawn, always 3 until wood 1
+        int wandererLifeTime = int.Parse(inputs[3]); // how many turns the wanderer is on map after spawning, always 40 until wood 1
+
+        
+        // game loop
+        while (true)
+        {
+            int entityCount = int.Parse(Console.ReadLine()); // the first given entity corresponds to your explorer
+            for (int i = 0; i < entityCount; i++)
+            {
+                inputs = Console.ReadLine().Split(' ');
+                string entityType = inputs[0];
+                int id = int.Parse(inputs[1]);
+                int x = int.Parse(inputs[2]);
+                int y = int.Parse(inputs[3]);
+                int param0 = int.Parse(inputs[4]);
+                int param1 = int.Parse(inputs[5]);
+                int param2 = int.Parse(inputs[6]);
+            }
+			// Construction des objets
+			if (Jeu.Nb_Instances == 0)
+				jeu = new Jeu(line, width, height, Point pos_hero, int sante_hero, Point[] pos_joueurs, int[] sante_joueurs, sanityLossLonely, sanityLossGroup, wandererSpawnTime, wandererLifeTime);
+			else
+				jeu.Update();
+
+            // Write an action using Console.WriteLine()
+            // To debug: Console.Error.WriteLine("Debug messages...");
+
+            Console.WriteLine(jeu.Commande()); // MOVE <x> <y> | WAIT
+        }
+    }
+}
