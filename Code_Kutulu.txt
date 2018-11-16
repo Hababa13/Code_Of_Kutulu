@@ -13,10 +13,16 @@ public class Point
 {
 	public int x;
 	public int y;
+	public Point() {}
 	public Point(int x,int y)
 	{
 		this.x = x;
 		this.y = y;
+	}
+	public void SetXY(int x, int y)
+	{
+	    this.x = x;
+	    this.y = y;
 	}
 }	
 
@@ -69,7 +75,7 @@ public class Plateau
     public int width;
     public int height;
     
-    Tableau(string[] Tab, int width, int height)
+    public Plateau (string[] Tab, int width, int height)
     {
         this.Tab = Tab;
         this.width = width;
@@ -78,42 +84,111 @@ public class Plateau
     
 }
 
-public class Joueur{
+public class Entite{
 	public int x;
 	public int y;
-	public int sante;
-	Joueur (int x, int y, int sante)
+	public int Id;
+	public Entite (Point p, int Id)
 	{
-		this.x 		= x;
-		this.y		= y;
+		this.x 		= p.x;
+		this.y		= p.y;
+		this.Id     = Id;
+	}
+}
+
+public class Joueur:Entite
+{
+	public int sante;
+	public Joueur (Point p_j, int sante, int Id) : base(p_j, Id)
+	{
 		this.sante 	= sante;
 	}
 }
 
-public class Hero:Joueur{
-	Hero(Point p_h, int sante) : base(p_h, sante) {}
+public class Hero:Entite
+{
+	public int sante;
+	public Hero(Point p_h, int sante, int Id) : base(p_h, Id)
+	{
+		this.sante 	= sante;
+	}
+	public void Update (Point p, int sante_Hero)
+	{
+	    this.x     = p.x;
+	    this.y     = p.y;
+	    this.sante = sante_Hero;
+	}
+}
+
+public class Wanderer:Entite
+{
+    public bool isWandering;
+    public int cible;
+    public int temps;
+    public Wanderer(Point p_w, bool isWandering, int temps, int Id, int cible) : base(p_w, Id)
+    {
+        this.x = p_w.x;
+        this.y = p_w.y;
+        this.isWandering = isWandering;
+        this.temps = temps;
+        this.cible = cible;
+    }
 }
 
 public class Joueur_Controller{
 	public Hero hero;
-	public Joueur[] joueur;
+	public List<Joueur> joueurs;
+	public List<Wanderer> wanderers;
 	public int Nb_joueurs = 3;
 	public int sanityLossLonely;
 	public int sanityLossGroup;
 	public int wandererSpawnTime;
 	public int wandererLifeTime;
 	
-	public Joueur_Controller(Point pos_hero, int sante_h, Point[] Pos_Joueurs, int[] sante_J, int sanityLossLonely, int sanityLossGroup, int wandererSpawnTime, int wandererLifeTime)
+	public Joueur_Controller(int sanityLossLonely, int sanityLossGroup, 
+	                         int wandererSpawnTime, int wandererLifeTime)
 	{
+		hero = null;
+		joueurs = new List<Joueur>();
+	    wanderers = new List<Wanderer>();
 		this.sanityLossLonely = sanityLossLonely;
 		this.sanityLossGroup = sanityLossGroup;
-		this.wandererSpawnTime = wandererSpawnTime:
+		this.wandererSpawnTime = wandererSpawnTime;
 		this.wandererLifeTime = wandererLifeTime;
-		hero = new Hero(pos_hero, sante_h);
-		joueur = new Joueur[];
+	   
+	}
 	
-		for(int i=0;i<Nb_Joueurs;i++)
-			joueur[i] = new Joueur(Pos_Joueurs[i],sante_J[i]);
+	public void Update(Point pos_Hero, int sante_Hero, int Id_Hero,
+	                List<Point> pos_Joueurs, List<int> sante_Joueurs, List<int> id_J,
+					List<int> id_Wanderer, List<Point> pos_Wanderer, List<bool> is_Wandering, List<int> temps_Wanderer, List<int> cible_Wandering)
+	{
+		
+		// Update du hero
+		if (hero == null)
+    		hero = new Hero(pos_Hero, sante_Hero, Id_Hero);
+		hero.Update(pos_Hero, sante_Hero);
+		
+		// Update des joueurs
+		List<int> A_retirer = new List<int>();
+		foreach (Joueur j in joueurs)
+			if (id_J.Any(p => p==j.Id))
+			    A_retirer.Add(j.Id);
+	    foreach (int i in A_retirer)
+	        joueurs.RemoveAll(n=>n.Id==i);
+
+	    
+	    // Update des wanderers
+	    A_retirer.Clear();
+		foreach (Wanderer j in wanderers)
+			if (id_Wanderer.Any(p => p==j.Id))
+			    A_retirer.Add(j.Id);
+	    foreach (int i in A_retirer)
+	        wanderers.RemoveAll(n=>n.Id==i);
+	    for (int i=0;i<id_Wanderer.Count();i++)
+	        if (!wanderers.Any(n=> n.Id==id_Wanderer[i]))
+	            wanderers.Add(new Wanderer(pos_Wanderer[i],is_Wandering[i],temps_Wanderer[i],
+	                            id_Wanderer[i],cible_Wandering[i]));
+	    
 	}
 }
 
@@ -121,24 +196,31 @@ public class Jeu
 {
 	public Plateau plateau;
 	public Joueur_Controller joueur_Controller;
-	public static int Nb_Instances = 0;
-	public Jeu(string[] Tab, int width, int height, Point pos_hero, int sante_hero, Point[] pos_joueurs, int[] sante_joueurs, int sanityLossLonely, int sanityLossGroup, int wandererSpawnTime, int wandererLifeTime)
+	public Jeu(string[] Tab, int width, int height, int sanityLossLonely,
+		                int sanityLossGroup, int wandererSpawnTime, int wandererLifeTime)
 	{
-		plateau = new Plateau(Tab, width, height);
-		joueur_Controller = new Joueur_Controller(pos_hero, sante_hero, pos_joueurs, sante_joueurs, sanityLossLonely, sanityLossGroup, wandererSpawnTime, wandererLifeTime);
-		Nb_Instances++;
+		plateau             = new Plateau(Tab, width, height);
+		joueur_Controller   = new Joueur_Controller(sanityLossLonely,
+		                                            sanityLossGroup,
+		                                            wandererSpawnTime,
+		                                            wandererLifeTime);
 	}
 	
-	public void Update()
+	public void Update(Point pos_Hero, int sante_Hero,int id_Hero,
+	                List<Point> pos_Joueurs, List<int> sante_Joueurs, List<int> id_J,
+					List<int> id_Wanderer, List<Point> pos_Wanderer, List<bool> is_Wandering, List<int> temps_Wanderer, List<int> cible_Wandering)
 	{
-		
+		joueur_Controller.Update(pos_Hero, sante_Hero, id_Hero,
+	                pos_Joueurs, sante_Joueurs, id_J,
+					id_Wanderer,pos_Wanderer, is_Wandering, temps_Wanderer, cible_Wandering);
 	}
 	
 	public string Commande()
 	{
-		string resultat = "";
+		string resultat = "WAIT";
 		return resultat;
 	}
+}
 
 class Player
 {
@@ -147,11 +229,29 @@ class Player
         string[] inputs;
         int width = int.Parse(Console.ReadLine());
         int height = int.Parse(Console.ReadLine());
-        string[] line = [];
+        
+        // Infos hero
+        int id_Hero = -1;
+		int sante_Hero = -1;
+		Point pos_Hero = new Point();
+
+        // Infos joueurs
+        List<int> id_Joueurs = new List<int>();
+        List<int> sante_Joueurs = new List<int>();
+        List<Point> pos_Joueurs = new List<Point>();
+        
+        // Infos Wanderer
+        List<Point> pos_Wanderer = new List<Point>();
+        List<int> id_Wanderer = new List<int>();
+        List<int> temps_Wanderer = new List<int>();
+        List<bool> is_Wandering= new List<bool>();
+        List<int> cible_Wandering = new List<int>();
+        
+        string[] line = new string[height];
 		Jeu jeu;
         for (int i = 0; i < height; i++)
         {
-            line.append(Console.ReadLine());
+            line[i] = Console.ReadLine();
         }
         inputs = Console.ReadLine().Split(' ');
         int sanityLossLonely = int.Parse(inputs[0]); // how much sanity you lose every turn when alone, always 3 until wood 1
@@ -159,10 +259,25 @@ class Player
         int wandererSpawnTime = int.Parse(inputs[2]); // how many turns the wanderer take to spawn, always 3 until wood 1
         int wandererLifeTime = int.Parse(inputs[3]); // how many turns the wanderer is on map after spawning, always 40 until wood 1
 
+		jeu = new Jeu(line, width, height,
+		                sanityLossLonely,
+		                sanityLossGroup,
+		                wandererSpawnTime,
+		                wandererLifeTime);
         
         // game loop
         while (true)
         {
+            // Clear des listes
+            pos_Wanderer.Clear();
+            id_Wanderer.Clear();
+            temps_Wanderer.Clear();
+            is_Wandering.Clear();
+            cible_Wandering.Clear();
+            id_Joueurs.Clear();
+            sante_Joueurs.Clear();
+            pos_Joueurs.Clear();
+            
             int entityCount = int.Parse(Console.ReadLine()); // the first given entity corresponds to your explorer
             for (int i = 0; i < entityCount; i++)
             {
@@ -174,17 +289,32 @@ class Player
                 int param0 = int.Parse(inputs[4]);
                 int param1 = int.Parse(inputs[5]);
                 int param2 = int.Parse(inputs[6]);
+                if (i==0)
+                {
+                    pos_Hero.SetXY(x,y);
+                    sante_Hero  = param0;
+                    id_Hero     = id;
+                }
+                else if (entityType=="EXPLORER") // Cas explorer
+                {
+                    pos_Joueurs.Add(new Point(x,y));
+                    sante_Joueurs.Add(param0);
+                    id_Joueurs.Add(id);
+                }
+                else // Cas wanderer
+                {
+                    id_Wanderer.Add(id);
+                    pos_Wanderer.Add(new Point(x,y));
+                    is_Wandering.Add(param1==1);
+                    temps_Wanderer.Add(param0);
+                    cible_Wandering.Add(param2);
+                }
             }
-			// Construction des objets
-			if (Jeu.Nb_Instances == 0)
-				jeu = new Jeu(line, width, height, Point pos_hero, int sante_hero, Point[] pos_joueurs, int[] sante_joueurs, sanityLossLonely, sanityLossGroup, wandererSpawnTime, wandererLifeTime);
-			else
-				jeu.Update();
 
-            // Write an action using Console.WriteLine()
-            // To debug: Console.Error.WriteLine("Debug messages...");
+			jeu.Update(pos_Hero, sante_Hero, id_Hero,pos_Joueurs,sante_Joueurs, id_Joueurs, 
+				id_Wanderer, pos_Wanderer, is_Wandering, temps_Wanderer, cible_Wandering);
 
-            Console.WriteLine(jeu.Commande()); // MOVE <x> <y> | WAIT
+            Console.WriteLine(jeu.Commande());
         }
     }
 }
