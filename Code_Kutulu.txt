@@ -24,6 +24,10 @@ public class Point
 	    this.x = x;
 	    this.y = y;
 	}
+	public double Distance2 (Point p1)
+	{
+	    return (this.x-p1.x)*(this.x-p1.x) + (this.y-p1.y)*(this.y-p1.y);
+	}
 }	
 
 public class Vector
@@ -31,6 +35,7 @@ public class Vector
     public double x;
     public double y;
     public void SetXY(double x, double y) {this.x=x;this.y=y;}
+    public Vector (Point orig, Point dest) {this.x = dest.y-orig.x; this.y = dest.y-orig.y;}
     public Vector (double x, double y) {this.x=x;this.y=y;}
     public Vector () {this.x=0.0f;this.y=0.0f;}
     public double Norm2() {return x*x+y*y;}
@@ -69,17 +74,47 @@ public class Vector
     }
 }
 
+public enum Case 
+{
+    Mur, Vide, Portail
+}
+
 public class Plateau
 {
     public string[] Tab;
     public int width;
     public int height;
+    public Case[,] Mur;
+    public double[,] Penal;
     
     public Plateau (string[] Tab, int width, int height)
     {
         this.Tab = Tab;
         this.width = width;
         this.height = height;
+        int lig=0; int col=0;
+        this.Mur = new Case[height,width];
+        this.Penal = new double[height,width];
+        Reset_Penal();
+        foreach(string ligne in Tab)
+        {
+            foreach(char c in ligne)
+            {
+                if (c=='#') Mur[lig,col]=Case.Mur;
+                else if (c=='.') Mur[lig,col]=Case.Vide;
+                else Mur[lig,col]=Case.Portail;
+                col++;
+            }
+            lig++;
+            col=0;
+        }
+    }
+    
+    public void Reset_Penal()
+    {
+        for (int i=0;i<height;i++)
+            for(int j=0;j<width;j++)
+                Penal[i,j] = 0.0f;
     }
     
 }
@@ -87,12 +122,14 @@ public class Plateau
 public class Entite{
 	public int x;
 	public int y;
+	public Point pos;
 	public int Id;
 	public Entite (Point p, int Id)
 	{
 		this.x 		= p.x;
 		this.y		= p.y;
 		this.Id     = Id;
+		this.pos    = p;
 	}
 }
 
@@ -102,6 +139,13 @@ public class Joueur:Entite
 	public Joueur (Point p_j, int sante, int Id) : base(p_j, Id)
 	{
 		this.sante 	= sante;
+	}
+	public void Update (Point p_j, int sante)
+	{
+	    this.pos = p_j;
+	    this.x = p_j.x;
+	    this.y = p_j.y;
+	    this.sante = sante;
 	}
 }
 
@@ -127,11 +171,19 @@ public class Wanderer:Entite
     public int temps;
     public Wanderer(Point p_w, bool isWandering, int temps, int Id, int cible) : base(p_w, Id)
     {
-        this.x = p_w.x;
-        this.y = p_w.y;
         this.isWandering = isWandering;
         this.temps = temps;
         this.cible = cible;
+    }
+    public void Update(Point pos_wanderer,bool is_Wandering,int temps_Wanderer,
+	                           int cible_Wandering)
+	{
+	    this.pos = pos_wanderer;
+	    this.x = pos_wanderer.x;
+	    this.y = pos_wanderer.y;
+	    this.isWandering = is_Wandering;
+	    this.temps = temps_Wanderer;
+	    this.cible = cible_Wandering;
     }
 }
 
@@ -169,33 +221,115 @@ public class Joueur_Controller{
 		hero.Update(pos_Hero, sante_Hero);
 		
 		// Update des joueurs
-		List<int> A_retirer = new List<int>();
-		foreach (Joueur j in joueurs)
-			if (id_J.Any(p => p==j.Id))
-			    A_retirer.Add(j.Id);
-	    foreach (int i in A_retirer)
-	        joueurs.RemoveAll(n=>n.Id==i);
+		joueurs.Clear();
+		for (int i=0;i<id_J.Count();i++)
+		    joueurs.Add(new Joueur(pos_Joueurs[i],sante_Joueurs[i], id_J[i]));
 
-	    
 	    // Update des wanderers
-	    A_retirer.Clear();
-		foreach (Wanderer j in wanderers)
-			if (id_Wanderer.Any(p => p==j.Id))
-			    A_retirer.Add(j.Id);
-	    foreach (int i in A_retirer)
-	        wanderers.RemoveAll(n=>n.Id==i);
+	    wanderers.Clear();
 	    for (int i=0;i<id_Wanderer.Count();i++)
-	        if (!wanderers.Any(n=> n.Id==id_Wanderer[i]))
-	            wanderers.Add(new Wanderer(pos_Wanderer[i],is_Wandering[i],temps_Wanderer[i],
+	        wanderers.Add(new Wanderer(pos_Wanderer[i],is_Wandering[i],temps_Wanderer[i],
 	                            id_Wanderer[i],cible_Wandering[i]));
-	    
 	}
+}
+
+public class IA
+{
+    public enum Strategie {Penalisation, RL}
+    public Strategie strategie;
+    public Joueur_Controller joueur_C;
+    public Plateau plateau;
+    public IA()
+    {
+        this.strategie = Strategie.Penalisation;
+    }
+    
+    public string Analyse (Joueur_Controller joueur_C, Plateau plateau)
+    {
+        string resultat = "";
+        this.joueur_C = joueur_C;
+        this.plateau = plateau;
+        // Analyse
+        
+        if (strategie == Strategie.Penalisation)
+        {
+            double VarJ = 1.0f/16.0f;
+            double VarW = -1.0f/100.0f;
+            double VarM = 1.0f/4.0f;
+            double penal;
+            int x_h = joueur_C.hero.x;
+            int y_h = joueur_C.hero.y;
+            int x_res = 0;
+            int y_res = 0;
+            double h2 = Convert.ToDouble(plateau.height*plateau.height);
+            double w2 = Convert.ToDouble(plateau.width*plateau.width);
+            double min = 100.0f;
+            // Produit des pénalisations
+            for (int i=0;i<plateau.height;i++)
+                for (int j=0;j<plateau.width;j++) {
+                    penal = 0.0f;
+                    // Influence des joueurs (benefique)
+                    foreach (Joueur jj in joueur_C.joueurs)
+                    {
+                        penal+= 0.0*jj.pos.Distance2(new Point(j,i))*VarJ;
+                    }
+                    // Influence des minions (malefiques)
+                    foreach (Wanderer w in joueur_C.wanderers)
+                    {
+                        penal+= 0.0*w.pos.Distance2(new Point(j,i))*VarW;
+                    }
+                    // Influence de l'environnement (murs)
+                    penal+= 1.0f*VarM*(Convert.ToDouble((2*i-plateau.height)* (2*i-plateau.height))/h2+
+                    Convert.ToDouble((2*j-plateau.width)* (2*j-plateau.width))/w2);
+                    
+                    plateau.Penal[i,j] = penal;
+                }
+                string res = "";
+            for (int i=0;i<plateau.height;i++)
+                {
+                for (int j=0;j<plateau.width;j++)
+                res += (plateau.Penal[i,j]).ToString() + " ";
+                
+                res +="\n";
+                }
+                Console.Error.WriteLine(res);
+            // Choix de la meilleure possibilite
+            if (plateau.Mur[y_h,x_h-1] == Case.Vide)
+            {// A Gauche
+                min =plateau.Penal[y_h,x_h-1];
+                x_res = x_h -1;
+                y_res = y_h;
+            }
+            if ((plateau.Mur[y_h,x_h-1] == Case.Vide) & plateau.Penal[y_h,x_h+1]<min)
+            {// A Droite
+                min = plateau.Penal[y_h,x_h+1];
+                x_res = x_h +1;
+                y_res = y_h;
+            }
+            if ((plateau.Mur[y_h-1,x_h] == Case.Vide) & plateau.Penal[y_h-1,x_h]<min)
+            {// En haut
+                min = plateau.Penal[y_h-1,x_h];
+                x_res = x_h;
+                y_res = y_h - 1;
+            }
+            if ((plateau.Mur[y_h+1,x_h] == Case.Vide) & plateau.Penal[y_h+1,x_h]<min)
+            {// En Bas
+                min = plateau.Penal[y_h+1,x_h];
+                x_res = x_h;
+                y_res = y_h + 1;
+            }
+            resultat += "MOVE " + x_res.ToString() + " " + y_res.ToString();
+        }
+        
+        return resultat;
+    }
 }
 
 public class Jeu
 {
 	public Plateau plateau;
 	public Joueur_Controller joueur_Controller;
+	public IA iA;
 	public Jeu(string[] Tab, int width, int height, int sanityLossLonely,
 		                int sanityLossGroup, int wandererSpawnTime, int wandererLifeTime)
 	{
@@ -204,6 +338,7 @@ public class Jeu
 		                                            sanityLossGroup,
 		                                            wandererSpawnTime,
 		                                            wandererLifeTime);
+		iA = new IA();
 	}
 	
 	public void Update(Point pos_Hero, int sante_Hero,int id_Hero,
@@ -217,7 +352,7 @@ public class Jeu
 	
 	public string Commande()
 	{
-		string resultat = "WAIT";
+		string resultat = iA.Analyse(joueur_Controller, plateau);
 		return resultat;
 	}
 }
@@ -297,12 +432,14 @@ class Player
                 }
                 else if (entityType=="EXPLORER") // Cas explorer
                 {
+                    Console.Error.WriteLine("EXPLORER");
                     pos_Joueurs.Add(new Point(x,y));
                     sante_Joueurs.Add(param0);
                     id_Joueurs.Add(id);
                 }
                 else // Cas wanderer
                 {
+                    Console.Error.WriteLine("WANDERER");
                     id_Wanderer.Add(id);
                     pos_Wanderer.Add(new Point(x,y));
                     is_Wandering.Add(param1==1);
