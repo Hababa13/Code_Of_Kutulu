@@ -28,6 +28,10 @@ public class Point
 	{
 	    return (this.x-p1.x)*(this.x-p1.x) + (this.y-p1.y)*(this.y-p1.y);
 	}
+	public double Distance (Point p1)
+	{
+	    return Math.Pow((this.x-p1.x)*(this.x-p1.x) + (this.y-p1.y)*(this.y-p1.y),0.5);
+	}
 }	
 
 public class Vector
@@ -86,6 +90,9 @@ public class Plateau
     public int height;
     public Case[,] Mur;
     public double[,] Penal;
+    public double[,] PenalJ;
+    public double[,] PenalW;
+    public double[,] PenalE;
     
     public Plateau (string[] Tab, int width, int height)
     {
@@ -95,6 +102,9 @@ public class Plateau
         int lig=0; int col=0;
         this.Mur = new Case[height,width];
         this.Penal = new double[height,width];
+        this.PenalJ = new double[height,width];
+        this.PenalW = new double[height,width];
+        this.PenalE = new double[height,width];
         Reset_Penal();
         foreach(string ligne in Tab)
         {
@@ -114,7 +124,12 @@ public class Plateau
     {
         for (int i=0;i<height;i++)
             for(int j=0;j<width;j++)
-                Penal[i,j] = 0.0f;
+            {
+                Penal[i,j] = 0.0;
+                PenalJ[i,j] = 0.0;
+                PenalW[i,j] = 0.0;
+                PenalE[i,j] = 0.0;
+            }
     }
     
 }
@@ -254,7 +269,7 @@ public class IA
         if (strategie == Strategie.Penalisation)
         {
             double VarJ = 1.0f/16.0f;
-            double VarW = -1.0f/100.0f;
+            double VarW = -1.0f/4.0f;
             double VarM = 1.0f/4.0f;
             double penal;
             int x_h = joueur_C.hero.x;
@@ -264,6 +279,7 @@ public class IA
             double h2 = Convert.ToDouble(plateau.height*plateau.height);
             double w2 = Convert.ToDouble(plateau.width*plateau.width);
             double min = 100.0f;
+            plateau.Reset_Penal();
             // Produit des pénalisations
             for (int i=0;i<plateau.height;i++)
                 for (int j=0;j<plateau.width;j++) {
@@ -271,28 +287,53 @@ public class IA
                     // Influence des joueurs (benefique)
                     foreach (Joueur jj in joueur_C.joueurs)
                     {
-                        penal+= 0.0*jj.pos.Distance2(new Point(j,i))*VarJ;
+                        plateau.PenalJ[i,j]+= joueur_C.joueurs.Min(n=>n.pos.Distance(new Point(j,i))*VarJ);//jj.pos.Distance(new Point(j,i))*VarJ;
                     }
                     // Influence des minions (malefiques)
                     foreach (Wanderer w in joueur_C.wanderers)
                     {
-                        penal+= 0.0*w.pos.Distance2(new Point(j,i))*VarW;
+                        plateau.PenalW[i,j]+= joueur_C.wanderers.Max(n=>n.pos.Distance(new Point(j,i))*VarW);
                     }
                     // Influence de l'environnement (murs)
-                    penal+= 1.0f*VarM*(Convert.ToDouble((2*i-plateau.height)* (2*i-plateau.height))/h2+
+                    plateau.PenalE[i,j]+= VarM*(Convert.ToDouble((2*i-plateau.height)* (2*i-plateau.height))/h2+
                     Convert.ToDouble((2*j-plateau.width)* (2*j-plateau.width))/w2);
                     
-                    plateau.Penal[i,j] = penal;
+                    plateau.Penal[i,j] = plateau.PenalJ[i,j]+ plateau.PenalW[i,j] + 0.0*plateau.PenalE[i,j];
                 }
-                string res = "";
-            for (int i=0;i<plateau.height;i++)
-                {
-                for (int j=0;j<plateau.width;j++)
-                res += (plateau.Penal[i,j]).ToString() + " ";
-                
+            double resol = 1000.0;
+            string res = "";
+            for (int i=Convert.ToInt32(Math.Max(0,y_h-5));i<Convert.ToInt32(Math.Min(plateau.height,y_h+5));i++)
+            {
+                for (int j=Convert.ToInt32(Math.Max(0,x_h-5));j<Convert.ToInt32(Math.Min(plateau.width,x_h+5));j++)
+                    res += (Convert.ToSingle(Convert.ToInt32(plateau.Penal[i,j]*resol))/resol).ToString() + " ";
                 res +="\n";
-                }
-                Console.Error.WriteLine(res);
+            }
+            Console.Error.WriteLine("X= " +x_h+" Y= " + y_h+"\n" +res);
+            string resJ = "";
+            for (int i=Convert.ToInt32(Math.Max(0,y_h-5));i<Convert.ToInt32(Math.Min(plateau.height,y_h+5));i++)
+            {
+                for (int j=Convert.ToInt32(Math.Max(0,x_h-5));j<Convert.ToInt32(Math.Min(plateau.width,x_h+5));j++)
+                    resJ += (Convert.ToSingle(Convert.ToInt32(plateau.PenalJ[i,j]*resol)/resol)).ToString() + " ";
+                resJ +="\n";
+            }
+            Console.Error.WriteLine("JOEURS \n" +resJ);
+            string resW = "";
+            for (int i=Convert.ToInt32(Math.Max(0,y_h-5));i<Convert.ToInt32(Math.Min(plateau.height,y_h+5));i++)
+            {
+                for (int j=Convert.ToInt32(Math.Max(0,x_h-5));j<Convert.ToInt32(Math.Min(plateau.width,x_h+5));j++)
+                    resW += (Convert.ToSingle(Convert.ToInt32(plateau.PenalW[i,j]*resol)/resol)).ToString() + " ";
+                resW +="\n";
+            }
+            Console.Error.WriteLine("WANDERERS \n"+resW);
+            string resE = "";
+            for (int i=Convert.ToInt32(Math.Max(0,y_h-5));i<Convert.ToInt32(Math.Min(plateau.height,y_h+5));i++)
+            {
+                for (int j=Convert.ToInt32(Math.Max(0,x_h-5));j<Convert.ToInt32(Math.Min(plateau.width,x_h+5));j++)
+                    resE += (Convert.ToSingle(Convert.ToInt32(plateau.PenalE[i,j]*resol)/resol)).ToString() + " ";
+                resE +="\n";
+            }
+            Console.Error.WriteLine("ENVIRONNEMENT\n" +resE);
+            
             // Choix de la meilleure possibilite
             if (plateau.Mur[y_h,x_h-1] == Case.Vide)
             {// A Gauche
@@ -300,7 +341,7 @@ public class IA
                 x_res = x_h -1;
                 y_res = y_h;
             }
-            if ((plateau.Mur[y_h,x_h-1] == Case.Vide) & plateau.Penal[y_h,x_h+1]<min)
+            if ((plateau.Mur[y_h,x_h+1] == Case.Vide) & plateau.Penal[y_h,x_h+1]<min)
             {// A Droite
                 min = plateau.Penal[y_h,x_h+1];
                 x_res = x_h +1;
@@ -432,14 +473,12 @@ class Player
                 }
                 else if (entityType=="EXPLORER") // Cas explorer
                 {
-                    Console.Error.WriteLine("EXPLORER");
                     pos_Joueurs.Add(new Point(x,y));
                     sante_Joueurs.Add(param0);
                     id_Joueurs.Add(id);
                 }
                 else // Cas wanderer
                 {
-                    Console.Error.WriteLine("WANDERER");
                     id_Wanderer.Add(id);
                     pos_Wanderer.Add(new Point(x,y));
                     is_Wandering.Add(param1==1);
